@@ -1,0 +1,11 @@
+user_account
+    password hash (bcrypt)
+    username/email
+    unique user id
+    hashing algorithm
+
+CREATE TABLE user_account (
+       user_id SERIAL PRIMARY KEY,
+       username VARCHAR(32) NOT NULL,
+       password_hash VARCHAR(128) NOT NULL
+)
