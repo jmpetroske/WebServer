@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
-//    "golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/bcrypt"
 	"database/sql"
 	_ "github.com/lib/pq"
 	"github.com/gorilla/mux"
@@ -21,42 +22,60 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("usr")
 	password := r.FormValue("pwd")
 
+	redirectTarget := "/?badlogin=1"
 	if username != "" && password != "" {
-
-		
 		databaseConnString := "postgres://petroske:@localhost/accounts?sslmode=disable"
 		
 		db, err := sql.Open("postgres", databaseConnString)
 		checkErr(err)
-		
-		_, err = db.Query(
-			`INSERT INTO user_account (username, password_hash) VALUES ($1, $2);`,
-			username,
-			"password")
-		checkErr(err)
 
-		//err := bcrypt.CompareHashAndPassword
+		fmt.Printf("Signing in user: %s\n", username)
+		rows, err := db.Query(`SELECT password_hash FROM user_account WHERE username=$1`,
+			username)
+		checkErr(err)
+		defer rows.Close()
+
+		var passwordHash string
+		if rows.Next() {
+			err = rows.Scan(&passwordHash)
+			checkErr(err)
+
+			err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
+
+			if err == nil {
+				redirectTarget = "/hello"
+			}
+		}
 	}
+	
+	http.Redirect(w, r, redirectTarget, 302)
 }
 
 func createAccountHandler(w http.ResponseWriter, r *http.Request) {	
 	username := r.FormValue("usr")
 	password := r.FormValue("pwd")
 
-//	redirectTarget := "/"
+	redirectTarget := "/"
 	if username != "" && password != "" {
+		// TODO check if username already exists
+		
 		databaseConnString := "postgres://petroske:@localhost/accounts?sslmode=disable"
 		
 		db, err := sql.Open("postgres", databaseConnString)
+		checkErr(err)
+
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 		checkErr(err)
 		
 		_, err = db.Query(
 			`INSERT INTO user_account (username, password_hash) VALUES ($1, $2);`,
 			username,
-			"password")
+			passwordHash)
 		checkErr(err)
 
+		redirectTarget = "/hello";
 	}
+	http.Redirect(w, r, redirectTarget, 302)
 }
 
 func main() {
